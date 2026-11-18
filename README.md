@@ -36,3 +36,5 @@ The desktop app reads the datasets from `apps/frontend/public/datasets` of this 
 
 On the first opening of the day (when the data is not from today) the desktop app runs `bun run dataset` itself, in the background. The header shows "Updating data..." meanwhile, and the new data is used as soon as it is ready. The output is written to `dataset-refresh.log`. When the refresh fails or the fetched data is incomplete, the existing datasets are kept and the app tries again the next time it is opened, at most once an hour. This needs `bun` and this folder on the machine.
 
+Once a day the desktop app also checks the original DraftGap repository (with `git`) for changes this version does not have yet, and shows a message listing them. "Got it" hides the message until there are newer changes, "Later" shows it again the next day. The changes are not brought in automatically, as they can touch the same files as the changes of this version.
+

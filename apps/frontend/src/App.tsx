@@ -5,10 +5,12 @@ import {
     createSignal,
     For,
     Match,
+    onMount,
     Show,
     Switch,
     untrack,
 } from "solid-js";
+import { checkUpstreamUpdatesDaily } from "./utils/upstream-updates";
 import DraftTable from "./components/draft/DraftTable";
 import { RoleFilter } from "./components/draft/RoleFilter";
 import { Search } from "./components/draft/Search";
@@ -54,6 +56,10 @@ const App: Component = () => {
     const { startLolClientIntegration, stopLolClientIntegration } =
         useLolClient();
     const { isDesktop } = useMedia();
+
+    onMount(() => {
+        void checkUpstreamUpdatesDaily();
+    });
 
     createEffect(() => {
         if (config.disableLeagueClientIntegration) {

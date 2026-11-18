@@ -5,7 +5,7 @@ import toast, { Toast as ToastModel } from "solid-toast";
 type Props = {
     t: ToastModel;
     title: string;
-    content: string;
+    content: JSX.Element;
     icon: {
         path: JSX.Element;
         outline?: boolean;
@@ -32,9 +32,9 @@ export const Toast: Component<Props> = (props) => {
                         <p class="text-xl font-medium text-gray-50 uppercase">
                             {props.title}
                         </p>
-                        <p class="mt-1 text-gray-300 font-body">
+                        <div class="mt-1 text-gray-300 font-body">
                             {props.content}
-                        </p>
+                        </div>
                         <Show when={props.dismissText && props.okText}>
                             <div class="mt-1 flex justify-between">
                                 <button

@@ -244,6 +244,73 @@ async fn refresh_dataset() -> Result<(), String> {
     result?
 }
 
+// The original DraftGap repository, DRAFTGAP_UPSTREAM_URL replaces it (ex. for testing)
+const UPSTREAM_URL: &str = "https://github.com/vigovlugt/draftgap.git";
+
+#[derive(Serialize)]
+struct UpstreamCommit {
+    hash: String,
+    date: String,
+    subject: String,
+}
+
+fn run_git(args: &[&str]) -> Result<String, String> {
+    let mut command = std::process::Command::new("git");
+    command
+        .args(args)
+        .current_dir(REPO_DIR)
+        // Never wait for a login prompt, the repository is public
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .stdin(std::process::Stdio::null());
+    #[cfg(target_os = "windows")]
+    command.creation_flags(0x08000000); // CREATE_NO_WINDOW
+
+    let output = command
+        .output()
+        .map_err(|e| format!("Could not run git: {e}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "git {} failed: {}",
+            args.join(" "),
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+
+    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+}
+
+// Lists the commits of the original repository that the checked out branch does not have yet, newest first
+#[tauri::command]
+async fn check_upstream_updates() -> Result<Vec<UpstreamCommit>, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        let upstream =
+            std::env::var("DRAFTGAP_UPSTREAM_URL").unwrap_or_else(|_| UPSTREAM_URL.to_owned());
+        // The full name, as the original repository also has an old tag called main
+        run_git(&[
+            "fetch",
+            "--quiet",
+            "--no-tags",
+            &upstream,
+            "refs/heads/main",
+        ])?;
+        let log = run_git(&["log", "--format=%H%x1f%cs%x1f%s", "HEAD..FETCH_HEAD"])?;
+
+        Ok(log
+            .lines()
+            .filter_map(|line| {
+                let mut parts = line.splitn(3, '\x1f');
+                Some(UpstreamCommit {
+                    hash: parts.next()?.to_owned(),
+                    date: parts.next()?.to_owned(),
+                    subject: parts.next()?.to_owned(),
+                })
+            })
+            .collect())
+    })
+    .await
+    .map_err(|e| format!("Update check crashed: {e}"))?
+}
+
 fn main() {
     let client = Client::builder()
         .danger_accept_invalid_certs(true)
@@ -267,7 +334,8 @@ fn main() {
             get_grid_champions,
             get_pickable_champion_ids,
             read_dataset,
-            refresh_dataset
+            refresh_dataset,
+            check_upstream_updates
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

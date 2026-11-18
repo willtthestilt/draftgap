@@ -1,6 +1,46 @@
-import { check, exclamationCircle, star } from "solid-heroicons/outline";
+import {
+    check,
+    exclamationCircle,
+    sparkles,
+    star,
+} from "solid-heroicons/outline";
+import { For } from "solid-js";
 import toast from "solid-toast";
 import { Toast } from "../components/common/Toast";
+
+export const createUpstreamUpdatesToast = (
+    commits: { subject: string }[],
+    onSeen: () => void,
+) => {
+    const shown = commits.slice(0, 3);
+
+    return toast.custom((t) => (
+        <Toast
+            t={t}
+            icon={sparkles}
+            title="The original DraftGap changed"
+            content={
+                <>
+                    {commits.length} new{" "}
+                    {commits.length === 1 ? "change" : "changes"} that your
+                    version does not have yet:
+                    <ul class="list-disc ml-5 my-1">
+                        <For each={shown}>
+                            {(commit) => <li>{commit.subject}</li>}
+                        </For>
+                    </ul>
+                    {commits.length > shown.length
+                        ? `And ${commits.length - shown.length} more. `
+                        : ""}
+                    Ask Claude to bring them in.
+                </>
+            }
+            dismissText="Later"
+            okText="Got it"
+            onSubmit={onSeen}
+        />
+    ));
+};
 
 export const createImportFavouritePicksToast = (onSubmit: () => void) => {
     return toast.custom((t) => (
