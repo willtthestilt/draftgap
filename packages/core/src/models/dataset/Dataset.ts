@@ -1,5 +1,10 @@
 import { ChampionData } from "./ChampionData";
-import { deleteChampionRoleDataMatchupSynergyData } from "./ChampionRoleData";
+import {
+    ChampionRoleData,
+    defaultChampionRoleData,
+    deleteChampionRoleDataMatchupSynergyData,
+} from "./ChampionRoleData";
+import { Role, ROLES } from "../Role";
 import { RuneData, RunePathData, StatShardData } from "./RuneData";
 import { ItemData } from "./ItemData";
 import { ratingToWinrate, winrateToRating } from "../../rating/ratings";
@@ -34,6 +39,25 @@ export function deleteDatasetMatchupSynergyData(dataset: Dataset) {
             deleteChampionRoleDataMatchupSynergyData(role);
         }
     }
+}
+
+// Early in a patch a champion can have no games yet. It is kept with zero games,
+// so the analysis falls back to its data in the full dataset instead of leaving it out.
+export function addMissingChampions(dataset: Dataset, fullDataset: Dataset) {
+    const added: string[] = [];
+    for (const [key, champion] of Object.entries(fullDataset.championData)) {
+        if (dataset.championData[key]) continue;
+
+        dataset.championData[key] = {
+            ...champion,
+            statsByRole: Object.fromEntries(
+                ROLES.map((role) => [role, defaultChampionRoleData()]),
+            ) as Record<Role, ChampionRoleData>,
+        };
+        added.push(champion.name);
+    }
+
+    return added;
 }
 
 export function removeRankBias(dataset: Dataset) {

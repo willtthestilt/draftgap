@@ -1,7 +1,9 @@
 import "dotenv/config";
 import { getChampionDataFromLolalytics } from "./lolalytics";
 import { getPatchChanges } from "./lolalytics/patch-changes";
+import { getLolalyticsVersion } from "./lolalytics/current-patch";
 import {
+    addMissingChampions,
     DATASET_DAYS,
     deleteDatasetMatchupSynergyData,
     type Dataset,
@@ -83,8 +85,8 @@ const STAT_SHARD_DATA = {
 
 async function main() {
     const versions = await getVersions();
-    const currentVersion = versions[0];
-    console.log("Patch:", currentVersion);
+    const currentVersion = await getLolalyticsVersion(versions);
+    console.log("Patch:", currentVersion, "(newest released:", versions[0] + ")");
 
     const [championsData, runes, items, summonerSpells, championsDataCn] =
         await Promise.all([
@@ -121,7 +123,10 @@ async function main() {
 
     deleteDatasetMatchupSynergyData(datasetCurrentPatch);
 
-    const patchChanges = await getPatchChanges(versions);
+    // Patches lolalytics has no data for yet are left out
+    const patchChanges = await getPatchChanges(
+        versions.slice(Math.max(versions.indexOf(currentVersion), 0)),
+    );
     datasetCurrentPatch.patchChanges = patchChanges;
     datasetFull.patchChanges = patchChanges;
 
@@ -137,6 +142,13 @@ async function main() {
     ) {
         throw new Error(
             `Incomplete data (${currentPatchCount} champions for the current patch, ${fullCount} for ${FULL_DATASET_NAME}, ${champions.length} expected), keeping the existing datasets`,
+        );
+    }
+
+    const added = addMissingChampions(datasetCurrentPatch, datasetFull);
+    if (added.length > 0) {
+        console.log(
+            `No current patch data for ${added.join(", ")}, using their ${FULL_DATASET_NAME} data`,
         );
     }
 
@@ -252,13 +264,21 @@ async function getDataset(
         );
         const batch = champions.slice(i, i + BATCH_SIZE);
         const championData = await Promise.all(
-            batch.map(
-                async (champion) =>
-                    [
+            batch.map(async (champion) => {
+                // One champion must not stop the refresh, the completeness check in main decides
+                try {
+                    return [
                         champion,
                         await getChampionDataFromLolalytics(version, champion),
-                    ] as const,
-            ),
+                    ] as const;
+                } catch (e) {
+                    console.log(
+                        `Error for champion ${champion.name}:`,
+                        e instanceof Error ? e.message : e,
+                    );
+                    return [champion, undefined] as const;
+                }
+            }),
         );
 
         for (const [c, champion] of championData) {

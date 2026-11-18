@@ -29,10 +29,11 @@ type LolalyticsChampionChange = LolalyticsLaneChange & {
 type LolalyticsPatchNotes = {
     // [patch, previous patch]
     patches: [string, string];
-    changes: {
-        buffs: LolalyticsChampionChange[];
-        nerfs: LolalyticsChampionChange[];
-        adjusted: LolalyticsChampionChange[];
+    // A list is left out when the patch has no champions of that kind (ex. no adjusted champions)
+    changes?: {
+        buffs?: LolalyticsChampionChange[];
+        nerfs?: LolalyticsChampionChange[];
+        adjusted?: LolalyticsChampionChange[];
     };
 };
 
@@ -44,6 +45,10 @@ async function getLolalyticsPatchNotes(patch: string) {
 
     const url = `https://lolalytics.com/?${queryParams.toString()}`;
     const res = await retry(() => fetch(url));
+    // Lolalytics has no page for a patch it has no data for yet
+    if (res.status === 404) {
+        return undefined;
+    }
     if (!res.ok) {
         throw new Error(
             "Failed to fetch lolalytics patch notes " + url + " " + res.status,
@@ -83,9 +88,9 @@ export async function getPatchChanges(versions: string[]) {
         if (patchNotes) {
             const changesByType: [PatchChangeType, LolalyticsChampionChange[]][] =
                 [
-                    ["buff", patchNotes.changes.buffs],
-                    ["nerf", patchNotes.changes.nerfs],
-                    ["adjusted", patchNotes.changes.adjusted],
+                    ["buff", patchNotes.changes?.buffs ?? []],
+                    ["nerf", patchNotes.changes?.nerfs ?? []],
+                    ["adjusted", patchNotes.changes?.adjusted ?? []],
                 ];
             for (const [type, changes] of changesByType) {
                 for (const change of changes) {
@@ -101,7 +106,7 @@ export async function getPatchChanges(versions: string[]) {
                 }
             }
             console.log(
-                `Patch ${patch} changes: ${patchNotes.changes.buffs.length} buffs, ${patchNotes.changes.nerfs.length} nerfs, ${patchNotes.changes.adjusted.length} adjusted`,
+                `Patch ${patch} changes: ${changesByType.map(([type, changes]) => `${changes.length} ${type}`).join(", ")}`,
             );
         }
 

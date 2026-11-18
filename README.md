@@ -17,6 +17,8 @@ The data is not downloaded from draftgap.com, it is generated on your own machin
 
 The rank and period are set by `DATASET_TIER` and `DATASET_DAYS` in `packages/core/src/models/dataset/Dataset.ts`.
 
+Riot releases a new patch before Lolalytics has data for it. The current patch is therefore the one Lolalytics itself shows as current, and a champion without games in the current patch yet uses its 30-day data.
+
 Two things differ from the original in the analysis:
 
 - The draft table has a Lane column (with the advanced winrates), the matchup against the lane opponents: the same position, or the bottom and support together.
