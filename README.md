@@ -19,10 +19,11 @@ The rank and period are set by `DATASET_TIER` and `DATASET_DAYS` in `packages/co
 
 Riot releases a new patch before Lolalytics has data for it. The current patch is therefore the one Lolalytics itself shows as current, and a champion without games in the current patch yet uses its 30-day data.
 
-Two things differ from the original in the analysis:
+Three things differ from the original in the analysis:
 
 - The draft table has a Lane column (with the advanced winrates), the matchup against the lane opponents: the same position, or the bottom and support together.
 - The amount of games a duo or matchup needs before it is trusted (the prior games) is no longer the same for every pair. It is measured from the data per combination of positions (`packages/core/src/draft/pair-prior.ts`), the risk level scales it.
+- The current patch winrate of a champion is trusted sooner when the champion was changed in the current or previous patch. Other champions lean on their 30-day winrate, as it barely moves between patches when a champion is not changed (`packages/core/src/draft/champion-prior.ts`, measured on patches 16.20 to 16.22).
 
 ### Desktop app
 

@@ -4,6 +4,7 @@ import { Role } from "../models/Role";
 import { winrateToRating, ratingToWinrate } from "../rating/ratings";
 import { RiskLevel, priorGamesByRiskLevel } from "../risk/risk-level";
 import { addStats, averageStats } from "../stats";
+import { getChampionPriorGames } from "./champion-prior";
 import { getPairPriorGames } from "./pair-prior";
 import { getStats } from "./utils";
 
@@ -34,10 +35,10 @@ export function analyzeDraft(
     const priorGames = priorGamesByRiskLevel[config.riskLevel];
 
     const allyChampionRating = !config.ignoreChampionWinrates
-        ? analyzeChampions(dataset, fullDataset, team, priorGames)
+        ? analyzeChampions(dataset, fullDataset, team, config.riskLevel)
         : { totalRating: 0, winrate: 0, championResults: [] };
     const enemyChampionRating = !config.ignoreChampionWinrates
-        ? analyzeChampions(dataset, fullDataset, enemy, priorGames)
+        ? analyzeChampions(dataset, fullDataset, enemy, config.riskLevel)
         : { totalRating: 0, winrate: 0, championResults: [] };
 
     // The prior games of duos and matchups depend on the roles of the pair, the risk level scales them
@@ -88,7 +89,7 @@ export function analyzeChampions(
     dataset: Dataset,
     synergyMatchupDataset: Dataset,
     team: Map<Role, string>,
-    priorGames: number,
+    riskLevel: RiskLevel,
 ): AnalyzeChampionsResult {
     const championResults: AnalyzeChampionResult[] = [];
     let totalRating = 0;
@@ -99,7 +100,7 @@ export function analyzeChampions(
             synergyMatchupDataset,
             role,
             championKey,
-            priorGames,
+            riskLevel,
         );
 
         championResults.push(championResult);
@@ -117,8 +118,11 @@ export function analyzeChampion(
     fullDataset: Dataset,
     role: Role,
     championKey: string,
-    priorGames: number,
+    riskLevel: RiskLevel,
 ) {
+    // Fewer prior games for champions changed recently, see champion-prior.ts
+    const priorGames = getChampionPriorGames(dataset, championKey, riskLevel);
+
     // Get stats for this patch
     const championData = dataset.championData[championKey];
     const roleData = championData.statsByRole[role];

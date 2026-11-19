@@ -130,7 +130,11 @@ export function FAQDialog() {
                     also depends on the positions of the two champions. This
                     is measured from the data: a top versus top matchup needs
                     far fewer games than a top and middle duo, as lane
-                    opponents influence each other much more.
+                    opponents influence each other much more. Likewise, the
+                    winrate of the current patch is trusted sooner for a
+                    champion changed in the current or previous patch, as the
+                    winrate of a champion that was not changed barely moves
+                    between patches.
                 </p>
             </div>
 
