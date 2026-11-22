@@ -12,6 +12,7 @@ import {
 } from "solid-js";
 import { checkUpstreamUpdatesDaily } from "./utils/upstream-updates";
 import DraftTable from "./components/draft/DraftTable";
+import BanTable from "./components/draft/BanTable";
 import { RoleFilter } from "./components/draft/RoleFilter";
 import { Search } from "./components/draft/Search";
 import { TeamSelector } from "./components/draft/TeamSelector";
@@ -50,12 +51,14 @@ const App: Component = () => {
     const { config } = useUser();
     const { currentDraftView, setCurrentDraftView } = useDraftView();
     const { dataset, isLoaded, isRefreshing, refreshDaily } = useDataset();
-    const { allyTeam, opponentTeam, bans } = useDraft();
+    const { allyTeam, opponentTeam, allBans } = useDraft();
     const { analysisPick, setAnalysisPick, showAnalysisPick } =
         useDraftAnalysis();
     const { startLolClientIntegration, stopLolClientIntegration } =
         useLolClient();
-    const { isDesktop } = useMedia();
+    const { isDesktop, isMobileLayout } = useMedia();
+    const { selection } = useDraft();
+    const isBanning = () => selection.type === "ban";
 
     onMount(() => {
         void checkUpstreamUpdatesDaily();
@@ -71,14 +74,16 @@ const App: Component = () => {
 
     // Refreshed data can only replace the current data when it has every champion of the draft
     const isDraftInDataset = (dataset: Dataset) =>
-        [...allyTeam, ...opponentTeam]
-            .flatMap((pick) => [pick.championKey, pick.hoverKey])
-            .concat(bans)
-            .every(
-                (key) =>
-                    key === undefined ||
-                    dataset.championData[key] !== undefined,
-            );
+        [
+            ...[...allyTeam, ...opponentTeam].flatMap((pick) => [
+                pick.championKey,
+                pick.hoverKey,
+            ]),
+            ...allBans(),
+        ].every(
+            (key) =>
+                key === undefined || dataset.championData[key] !== undefined,
+        );
 
     createEffect(() => {
         if (isLoaded()) {
@@ -170,7 +175,12 @@ const App: Component = () => {
                                             <FilterMenu />
                                             <AnalyzeHoverToggle />
                                         </div>
-                                        <DraftTable />
+                                        <Show
+                                            when={isBanning()}
+                                            fallback={<DraftTable />}
+                                        >
+                                            <BanTable />
+                                        </Show>
                                     </div>
                                 </Match>
                                 <Match
@@ -262,45 +272,48 @@ const App: Component = () => {
                     </div>
                 </div>
             </header>
-            {/* Desktop main */}
-            <main
-                class="h-full lg:grid overflow-hidden hidden"
-                style={{
-                    "grid-template-columns": "1fr 4fr 1fr",
-                    "grid-template-rows": "100%",
-                }}
+            <Show
+                when={isMobileLayout()}
+                fallback={
+                    <main
+                        class="h-full grid overflow-hidden"
+                        style={{
+                            "grid-template-columns": "1fr 4fr 1fr",
+                            "grid-template-rows": "100%",
+                        }}
+                    >
+                        <TeamSidebar team="ally" />
+
+                        <MainView />
+
+                        <TeamSidebar team="opponent" />
+                    </main>
+                }
             >
-                <TeamSidebar team="ally" />
-
-                <MainView />
-
-                <TeamSidebar team="opponent" />
-            </main>
-
-            {/* Mobile main */}
-            <main class="h-full overflow-hidden lg:hidden">
-                <MainView />
-            </main>
-
-            {/* Mobile bottom nav */}
-            <nav class="bg-primary border-t-2 border-neutral-700 flex lg:hidden">
-                <For each={viewTabs()}>
-                    {(tab) => (
-                        <button
-                            class="flex-1 py-3 uppercase font-semibold text-neutral-500"
-                            classList={{
-                                "text-neutral-50!":
-                                    currentDraftView().type === tab.value,
-                            }}
-                            onClick={() =>
-                                setCurrentDraftView({ type: tab.value })
-                            }
-                        >
-                            {tab.value === "analysis" ? "Analysis" : tab.label}
-                        </button>
-                    )}
-                </For>
-            </nav>
+                <main class="h-full overflow-hidden">
+                    <MainView />
+                </main>
+                <nav class="bg-primary border-t-2 border-neutral-700 flex">
+                    <For each={viewTabs()}>
+                        {(tab) => (
+                            <button
+                                class="flex-1 py-3 uppercase font-semibold text-neutral-500"
+                                classList={{
+                                    "text-neutral-50!":
+                                        currentDraftView().type === tab.value,
+                                }}
+                                onClick={() =>
+                                    setCurrentDraftView({ type: tab.value })
+                                }
+                            >
+                                {tab.value === "analysis"
+                                    ? "Analysis"
+                                    : tab.label}
+                            </button>
+                        )}
+                    </For>
+                </nav>
+            </Show>
         </div>
     );
 };
