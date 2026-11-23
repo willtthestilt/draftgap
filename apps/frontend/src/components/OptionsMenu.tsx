@@ -1,13 +1,14 @@
 import { Icon } from "solid-heroicons";
 import { ellipsisVertical } from "solid-heroicons/solid";
 import {
+    chartBar,
     cog_6Tooth,
     envelope,
     globeAlt,
     heart,
     questionMarkCircle,
 } from "solid-heroicons/solid-mini";
-import { Component } from "solid-js";
+import { Component, Show } from "solid-js";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -20,13 +21,17 @@ import {
 } from "./common/DropdownMenu";
 import { cn } from "../utils/style";
 import { buttonVariants } from "./common/Button";
+import { useMedia } from "../hooks/useMedia";
 
 type Props = {
     setShowSettings: (show: boolean) => void;
     setShowFAQ: (show: boolean) => void;
+    setShowPredictionLog: (show: boolean) => void;
 };
 
 export const OptionsDropdownMenu: Component<Props> = (props) => {
+    const { isDesktop } = useMedia();
+
     return (
         <DropdownMenu>
             <DropdownMenuTrigger>
@@ -53,6 +58,14 @@ export const OptionsDropdownMenu: Component<Props> = (props) => {
                         <DropdownMenuIcon path={questionMarkCircle} />
                         <span>FAQ</span>
                     </DropdownMenuItem>
+                    <Show when={isDesktop}>
+                        <DropdownMenuItem
+                            onSelect={() => props.setShowPredictionLog(true)}
+                        >
+                            <DropdownMenuIcon path={chartBar} />
+                            <span>Prediction log</span>
+                        </DropdownMenuItem>
+                    </Show>
                     <DropdownMenuItem asChild>
                         <a
                             href="mailto:vigovlugt+draftgap@gmail.com"

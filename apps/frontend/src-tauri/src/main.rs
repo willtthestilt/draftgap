@@ -11,6 +11,7 @@ use reqwest::Client;
 use serde::Serialize;
 use serde_json::Value;
 use tauri::async_runtime::Mutex;
+use tauri::Manager;
 
 struct AppState {
     lcu_data: Mutex<Option<LcuData>>,
@@ -163,6 +164,47 @@ async fn get_current_summoner(state: tauri::State<'_, AppState>) -> Result<Value
 #[tauri::command]
 async fn get_grid_champions(state: tauri::State<'_, AppState>) -> Result<Value, String> {
     get_lcu_response(&state, "lol-champ-select/v1/all-grid-champions").await
+}
+
+// The last 20 games of the current summoner, for the results of the prediction log
+#[tauri::command]
+async fn get_match_history(state: tauri::State<'_, AppState>) -> Result<Value, String> {
+    get_lcu_response(
+        &state,
+        "lol-match-history/v1/products/lol/current-summoner/matches?begIndex=0&endIndex=20",
+    )
+    .await
+}
+
+// The prediction log is a file in the app data folder, as WebView storage can lose recent writes
+fn prediction_log_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("No app data folder: {e}"))?;
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| format!("Could not create {}: {e}", dir.display()))?;
+    Ok(dir.join("prediction-log.json"))
+}
+
+#[tauri::command]
+async fn read_prediction_log(app: tauri::AppHandle) -> Result<String, String> {
+    let path = prediction_log_path(&app)?;
+    match std::fs::read_to_string(&path) {
+        Ok(content) => Ok(content),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok("[]".to_owned()),
+        Err(e) => Err(format!("Could not read {}: {e}", path.display())),
+    }
+}
+
+#[tauri::command]
+async fn write_prediction_log(app: tauri::AppHandle, content: String) -> Result<(), String> {
+    let path = prediction_log_path(&app)?;
+    // Written to a temporary file first, so a crash never leaves half a log
+    let temp = path.with_extension("json.tmp");
+    std::fs::write(&temp, content)
+        .map_err(|e| format!("Could not write {}: {e}", temp.display()))?;
+    std::fs::rename(&temp, &path).map_err(|e| format!("Could not replace {}: {e}", path.display()))
 }
 
 #[tauri::command]
@@ -336,7 +378,10 @@ fn main() {
             get_pickable_champion_ids,
             read_dataset,
             refresh_dataset,
-            check_upstream_updates
+            check_upstream_updates,
+            get_match_history,
+            read_prediction_log,
+            write_prediction_log
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

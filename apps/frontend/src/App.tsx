@@ -35,6 +35,8 @@ import { LoadingIcon } from "./components/icons/LoadingIcon";
 import { DialogTrigger, Dialog } from "./components/common/Dialog";
 import SettingsDialog from "./components/dialogs/SettingsDialog";
 import { FAQDialog } from "./components/dialogs/FAQDialog";
+import { PredictionLogDialog } from "./components/dialogs/PredictionLogDialog";
+import { createPredictionLogger } from "./hooks/createPredictionLogger";
 import { DesktopAppDialog } from "./components/dialogs/DesktopAppDialog";
 import { UpdateDialog } from "./components/dialogs/UpdateDialog";
 import { OptionsDropdownMenu } from "./components/OptionsMenu";
@@ -93,6 +95,10 @@ const App: Component = () => {
 
     const [showSettings, setShowSettings] = createSignal(false);
     const [showFAQ, setShowFAQ] = createSignal(false);
+    const [showPredictionLog, setShowPredictionLog] = createSignal(false);
+    if (isDesktop) {
+        createPredictionLogger();
+    }
     const [showDownloadModal, setShowDownloadModal] = createSignal(false);
 
     const timeAgo = () =>
@@ -222,6 +228,12 @@ const App: Component = () => {
             }}
         >
             <UpdateDialog />
+            <Dialog
+                open={showPredictionLog()}
+                onOpenChange={setShowPredictionLog}
+            >
+                <PredictionLogDialog open={showPredictionLog()} />
+            </Dialog>
             <Dialog open={showFAQ()} onOpenChange={setShowFAQ}>
                 <FAQDialog />
             </Dialog>
@@ -268,6 +280,7 @@ const App: Component = () => {
                         <OptionsDropdownMenu
                             setShowSettings={setShowSettings}
                             setShowFAQ={setShowFAQ}
+                            setShowPredictionLog={setShowPredictionLog}
                         />
                     </div>
                 </div>

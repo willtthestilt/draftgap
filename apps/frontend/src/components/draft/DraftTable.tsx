@@ -11,10 +11,13 @@ import { useDraft } from "../../contexts/DraftContext";
 import { Role } from "@draftgap/core/src/models/Role";
 import { Suggestion } from "@draftgap/core/src/draft/suggestions";
 import { getLaneMatchupRating } from "@draftgap/core/src/draft/lane";
+import { createCounterPickRisk } from "@draftgap/core/src/draft/counter-risk";
+import { displayNameByRole } from "@draftgap/core/src/models/Role";
+import { ratingToWinrate } from "@draftgap/core/src/rating/ratings";
 import { Table } from "../common/Table";
 import ChampionCell from "../common/ChampionCell";
 import { RoleCell } from "../common/RoleCell";
-import { batch, createSignal, Show } from "solid-js";
+import { batch, createMemo, createSignal, For, Show } from "solid-js";
 import { Icon } from "solid-heroicons";
 import { star } from "solid-heroicons/solid";
 import { star as starOutline } from "solid-heroicons/outline";
@@ -31,11 +34,29 @@ import { Team } from "@draftgap/core/src/models/Team";
 import { championMatchesSearch } from "../../utils/search";
 import { focusSearch } from "./Search";
 import { createTableKeyboardNavigation } from "../../hooks/createTableKeyboardNavigation";
+import { useDraftAnalysis } from "../../contexts/DraftAnalysisContext";
+import { championName } from "../../utils/i18n";
+import { tooltip } from "../../directives/tooltip";
+// eslint-disable-next-line
+tooltip;
 
 export default function DraftTable() {
-    const { dataset } = useDataset();
-    const { selection, pickChampion, select, allBans, ownedChampions } =
-        useDraft();
+    const { dataset, fullDataset } = useDataset();
+    const {
+        allyTeamComp,
+        opponentTeamComp,
+        draftAnalysisConfig,
+        analyzeHovers,
+    } = useDraftAnalysis();
+    const {
+        selection,
+        pickChampion,
+        select,
+        allBans,
+        ownedChampions,
+        allyTeam,
+        opponentTeam,
+    } = useDraft();
     const {
         search,
         roleFilter,
@@ -50,6 +71,28 @@ export default function DraftTable() {
         selection.team === "opponent"
             ? opponentSuggestions()
             : allySuggestions();
+
+    // How much the enemy gains by answering a pick in lane, see counter-risk.ts
+    const counterPickRisk = createMemo(() => {
+        if (!config.showAdvancedWinrates || !dataset() || !fullDataset()) {
+            return undefined;
+        }
+
+        const unavailable = new Set(allBans());
+        for (const pick of [...allyTeam, ...opponentTeam]) {
+            if (pick.championKey) unavailable.add(pick.championKey);
+            if (pick.hoverKey && analyzeHovers())
+                unavailable.add(pick.hoverKey);
+        }
+
+        return createCounterPickRisk(
+            dataset()!,
+            fullDataset()!,
+            selection.team === "opponent" ? allyTeamComp() : opponentTeamComp(),
+            unavailable,
+            draftAnalysisConfig(),
+        );
+    });
 
     const ownsChampion = (championKey: string) =>
         // If we don't have owned champions, we are not logged in, so we own all champions.
@@ -268,6 +311,11 @@ export default function DraftTable() {
             ? ([
                   {
                       header: "Champions",
+                      meta: {
+                          // Smaller than the Winrate column, so all columns fit next to each other
+                          headerClass: "lg:text-xl",
+                          cellClass: "lg:text-xl",
+                      },
                       accessorFn: (suggestion) =>
                           suggestion.draftResult.allyChampionRating.totalRating,
                       cell: (info) => (
@@ -278,6 +326,11 @@ export default function DraftTable() {
                   },
                   {
                       header: "Matchups",
+                      meta: {
+                          // Smaller than the Winrate column, so all columns fit next to each other
+                          headerClass: "lg:text-xl",
+                          cellClass: "lg:text-xl",
+                      },
                       accessorFn: (suggestion) =>
                           suggestion.draftResult.matchupRating.totalRating,
                       cell: (info) => (
@@ -288,6 +341,11 @@ export default function DraftTable() {
                   },
                   {
                       header: "Lane",
+                      meta: {
+                          // Smaller than the Winrate column, so all columns fit next to each other
+                          headerClass: "lg:text-xl",
+                          cellClass: "lg:text-xl",
+                      },
                       accessorFn: (suggestion) =>
                           getLaneMatchupRating(
                               suggestion.draftResult,
@@ -311,7 +369,112 @@ export default function DraftTable() {
                       sortUndefined: "last",
                   },
                   {
+                      id: "counter",
+                      meta: {
+                          // Smaller than the Winrate column, so all columns fit next to each other
+                          headerClass: "lg:text-xl",
+                          cellClass: "lg:text-xl",
+                      },
+                      header: () => (
+                          <span
+                              // @ts-ignore
+                              use:tooltip={{
+                                  content: (
+                                      <>
+                                          Your lane if the enemy answers this
+                                          pick with its best counter, compared
+                                          to the champion it would pick anyway.
+                                          Below 50 means the pick can be
+                                          countered, so it is safer to pick it
+                                          late. A rare pick can look safe only
+                                          because its matchups have few games.
+                                      </>
+                                  ),
+                              }}
+                          >
+                              Counter
+                          </span>
+                      ),
+                      accessorFn: (suggestion) => {
+                          const risk = counterPickRisk()?.(
+                              suggestion.role,
+                              suggestion.championKey,
+                          );
+                          return risk ? -risk.risk : undefined;
+                      },
+                      cell: (info) => {
+                          const counters = () =>
+                              counterPickRisk()?.(
+                                  info.row.original.role,
+                                  info.row.original.championKey,
+                              )?.counters ?? [];
+                          return (
+                              <div class="flex justify-end">
+                                  <Show
+                                      when={info.getValue() !== undefined}
+                                      fallback={
+                                          <span class="text-neutral-500">
+                                              -
+                                          </span>
+                                      }
+                                  >
+                                      <span
+                                          // @ts-ignore
+                                          use:tooltip={{
+                                              content: (
+                                                  <>
+                                                      Enemy's best answer:
+                                                      <For each={counters()}>
+                                                          {(counter) => (
+                                                              <div>
+                                                                  {championName(
+                                                                      dataset()!
+                                                                          .championData[
+                                                                          counter
+                                                                              .championKey
+                                                                      ],
+                                                                      config,
+                                                                  )}{" "}
+                                                                  (
+                                                                  {
+                                                                      displayNameByRole[
+                                                                          counter
+                                                                              .role
+                                                                      ]
+                                                                  }
+                                                                  ), your
+                                                                  matchup{" "}
+                                                                  {(
+                                                                      100 *
+                                                                      ratingToWinrate(
+                                                                          counter.matchupRating,
+                                                                      )
+                                                                  ).toFixed(2)}
+                                                                  %
+                                                              </div>
+                                                          )}
+                                                      </For>
+                                                  </>
+                                              ),
+                                          }}
+                                      >
+                                          <RatingText
+                                              rating={info.getValue<number>()}
+                                          />
+                                      </span>
+                                  </Show>
+                              </div>
+                          );
+                      },
+                      sortUndefined: "last",
+                  },
+                  {
                       header: "Duos",
+                      meta: {
+                          // Smaller than the Winrate column, so all columns fit next to each other
+                          headerClass: "lg:text-xl",
+                          cellClass: "lg:text-xl",
+                      },
                       accessorFn: (suggestion) =>
                           suggestion.draftResult.allyDuoRating.totalRating,
                       cell: (info) => (

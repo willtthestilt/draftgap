@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { MatchHistoryGame } from "@draftgap/core/src/prediction-log";
 import {
     LolChampSelectChampSelectSession,
     LolChampSelectGridChampions,
@@ -23,4 +24,12 @@ export async function getGridChampions(): Promise<LolChampSelectGridChampions | 
 
 export async function getPickableChampionIds(): Promise<number[] | null> {
     return (await invoke("get_pickable_champion_ids")) as number[] | null;
+}
+
+export async function getMatchHistory(): Promise<{
+    games?: { games?: MatchHistoryGame[] };
+} | null> {
+    return (await invoke("get_match_history")) as {
+        games?: { games?: MatchHistoryGame[] };
+    } | null;
 }

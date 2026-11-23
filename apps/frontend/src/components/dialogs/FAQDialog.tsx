@@ -115,6 +115,22 @@ export function FAQDialog() {
             </div>
 
             <div>
+                <h2 class="text-2xl uppercase">
+                    What does the Counter column mean?
+                </h2>
+                <p class="font-body">
+                    The enemy picks after an early pick, so it can answer it
+                    in lane. The Counter column shows your lane if the enemy
+                    picks its best counter for the lane opponent positions it
+                    has not picked yet, compared to the champion it would pick
+                    anyway. Below 50 means the pick can be countered, so it is
+                    safer to pick it late. Hover the value to see the counter.
+                    A rare pick can look safe only because its matchups have
+                    few games.
+                </p>
+            </div>
+
+            <div>
                 <h2 class="text-2xl uppercase" id="faq-risk-level">
                     How does the risk level work?
                 </h2>
