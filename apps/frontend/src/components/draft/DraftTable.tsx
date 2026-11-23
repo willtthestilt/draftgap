@@ -9,7 +9,11 @@ import {
 } from "@tanstack/solid-table";
 import { useDraft } from "../../contexts/DraftContext";
 import { Role } from "@draftgap/core/src/models/Role";
-import { Suggestion } from "@draftgap/core/src/draft/suggestions";
+import {
+    getSuggestions,
+    Suggestion,
+} from "@draftgap/core/src/draft/suggestions";
+import { DATASET_DAYS } from "@draftgap/core/src/models/dataset/Dataset";
 import { getLaneMatchupRating } from "@draftgap/core/src/draft/lane";
 import { createCounterPickRisk } from "@draftgap/core/src/draft/counter-risk";
 import { displayNameByRole } from "@draftgap/core/src/models/Role";
@@ -72,6 +76,28 @@ export default function DraftTable() {
             ? opponentSuggestions()
             : allySuggestions();
 
+    // While searching, the positions below the minimum game count show too, as the champion was asked for
+    const searching = createMemo(() => search() !== "");
+    const allPositionSuggestions = createMemo(() => {
+        if (!searching() || !dataset() || !fullDataset()) return undefined;
+
+        const [team, enemy] =
+            selection.team === "opponent"
+                ? [opponentTeamComp(), allyTeamComp()]
+                : [allyTeamComp(), opponentTeamComp()];
+        return getSuggestions(dataset()!, fullDataset()!, team, enemy, {
+            ...draftAnalysisConfig(),
+            minGames: 0,
+        });
+    });
+
+    // Games of a pick in the full dataset, for the small sample warning
+    const fullDatasetGames = (suggestion: Suggestion) =>
+        fullDataset()?.championData[suggestion.championKey]?.statsByRole[
+            suggestion.role
+        ]?.games ?? 0;
+    const perWeek = (games: number) => (games / DATASET_DAYS) * 7;
+
     // How much the enemy gains by answering a pick in lane, see counter-risk.ts
     const counterPickRisk = createMemo(() => {
         if (!config.showAdvancedWinrates || !dataset() || !fullDataset()) {
@@ -99,7 +125,12 @@ export default function DraftTable() {
         ownedChampions().size === 0 || ownedChampions().has(championKey);
 
     const filteredSuggestions = () => {
-        let filtered = suggestions();
+        let filtered =
+            search() && allPositionSuggestions()
+                ? allPositionSuggestions()!.filter(
+                      (s) => fullDatasetGames(s) > 0,
+                  )
+                : suggestions();
         if (!dataset()) {
             return filtered;
         }
@@ -490,7 +521,16 @@ export default function DraftTable() {
             accessorFn: (suggestion) => suggestion.draftResult.totalRating,
             cell: (info) => (
                 <div class="flex justify-end">
-                    <RatingText rating={info.getValue<number>()} />
+                    <RatingText
+                        rating={info.getValue<number>()}
+                        // A pick below the minimum game count, shown while searching, gets the small sample warning
+                        games={
+                            perWeek(fullDatasetGames(info.row.original)) <
+                            config.minGames
+                                ? fullDatasetGames(info.row.original)
+                                : undefined
+                        }
+                    />
                 </div>
             ),
         },
