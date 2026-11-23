@@ -134,7 +134,10 @@ export function FAQDialog() {
                     winrate of the current patch is trusted sooner for a
                     champion changed in the current or previous patch, as the
                     winrate of a champion that was not changed barely moves
-                    between patches.
+                    between patches. The winrate of a rare pick is pulled toward
+                    the average of picks with a similar number of games, as
+                    rare picks are weaker on average, so a pick that got lucky
+                    in a few hundred games does not top the suggestions.
                 </p>
             </div>
 

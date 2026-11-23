@@ -4,7 +4,10 @@ import { Role } from "../models/Role";
 import { winrateToRating, ratingToWinrate } from "../rating/ratings";
 import { RiskLevel, priorGamesByRiskLevel } from "../risk/risk-level";
 import { addStats, averageStats } from "../stats";
-import { getChampionPriorGames } from "./champion-prior";
+import {
+    getChampionPriorGames,
+    getPulledFullWinrate,
+} from "./champion-prior";
 import { getPairPriorGames } from "./pair-prior";
 import { getStats } from "./utils";
 
@@ -139,10 +142,12 @@ export function analyzeChampion(
         },
     };
     const fullChampionRoleData = fullChampionData.statsByRole[role];
-    const fullChampionRoleWinrate =
-        fullChampionRoleData.games === 0
-            ? 0.5
-            : fullChampionRoleData.wins / fullChampionRoleData.games;
+    // Pulled toward picks with a similar number of games, see champion-prior.ts
+    const fullChampionRoleWinrate = getPulledFullWinrate(
+        fullDataset,
+        fullChampionRoleData,
+        riskLevel,
+    );
 
     const stats = addStats(
         {

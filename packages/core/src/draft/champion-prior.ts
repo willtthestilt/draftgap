@@ -69,3 +69,94 @@ export function getChampionPriorGames(
             : UNCHANGED_CHAMPION_PRIOR_GAMES) * scale
     );
 }
+
+/*
+Rare picks (ex. a champion outside its usual position) are weaker on average than popular ones:
+in the Master+ 30-day data, picks with fewer than 500 games averaged about 45%, popular picks about 50%.
+So the full dataset winrate of a pick is pulled toward the average of picks with a similar number of games,
+which keeps a rare pick that got lucky from topping the suggestions. Tested out of sample (games before
+patch 16.23 predicting 16.23): 250 to 500 prior games predicted best, a pull toward 50% predicted worse
+than no pull at all.
+*/
+const SIMILAR_PICKS_PRIOR_GAMES = 500;
+const GAMES_BUCKET_EDGES = [0, 500, 1000, 2000, 5000, 20000, Infinity];
+
+const similarPicksWinrateByDataset = new WeakMap<
+    Dataset,
+    (games: number) => number
+>();
+
+// The average winrate of picks with a similar number of games in the dataset
+function getSimilarPicksWinrate(fullDataset: Dataset) {
+    const cached = similarPicksWinrateByDataset.get(fullDataset);
+    if (cached) return cached;
+
+    const buckets = GAMES_BUCKET_EDGES.slice(0, -1).map(() => ({
+        wins: 0,
+        games: 0,
+        picks: 0,
+        logGames: 0,
+    }));
+    for (const champion of Object.values(fullDataset.championData)) {
+        for (const stats of Object.values(champion.statsByRole)) {
+            if (stats.games < 1) continue;
+            const bucket =
+                buckets[
+                    GAMES_BUCKET_EDGES.findIndex(
+                        (edge, i) =>
+                            stats.games >= edge &&
+                            stats.games < GAMES_BUCKET_EDGES[i + 1],
+                    )
+                ];
+            bucket.wins += stats.wins;
+            bucket.games += stats.games;
+            bucket.picks++;
+            bucket.logGames += Math.log10(stats.games);
+        }
+    }
+
+    // One point per bucket: its typical number of games and its average winrate, interpolated in between
+    const points = buckets
+        .filter((bucket) => bucket.picks > 0)
+        .map((bucket) => ({
+            x: bucket.logGames / bucket.picks,
+            winrate: bucket.wins / bucket.games,
+        }));
+
+    const winrate = (games: number) => {
+        if (points.length === 0) return 0.5;
+
+        const x = Math.log10(Math.max(games, 1));
+        if (x <= points[0].x) return points[0].winrate;
+        for (let i = 0; i < points.length - 1; i++) {
+            const [a, b] = [points[i], points[i + 1]];
+            if (x <= b.x) {
+                return (
+                    a.winrate +
+                    ((b.winrate - a.winrate) * (x - a.x)) / (b.x - a.x)
+                );
+            }
+        }
+        return points[points.length - 1].winrate;
+    };
+
+    similarPicksWinrateByDataset.set(fullDataset, winrate);
+    return winrate;
+}
+
+// The full dataset winrate of a pick, pulled toward picks with a similar number of games
+export function getPulledFullWinrate(
+    fullDataset: Dataset,
+    stats: { wins: number; games: number },
+    riskLevel: RiskLevel,
+) {
+    // The risk level scales the prior games, medium uses the tested value
+    const priorGames =
+        SIMILAR_PICKS_PRIOR_GAMES *
+        (priorGamesByRiskLevel[riskLevel] / priorGamesByRiskLevel["medium"]);
+    const similarWinrate = getSimilarPicksWinrate(fullDataset)(stats.games);
+
+    return (
+        (stats.wins + priorGames * similarWinrate) / (stats.games + priorGames)
+    );
+}

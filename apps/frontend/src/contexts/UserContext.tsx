@@ -15,7 +15,7 @@ const DEFAULT_CONFIG: DraftGapConfig = {
     // DRAFT CONFIG
     ignoreChampionWinrates: false,
     riskLevel: "medium",
-    minGames: 500,
+    minGames: 250,
     analyzeHovers: false,
 
     // UI
